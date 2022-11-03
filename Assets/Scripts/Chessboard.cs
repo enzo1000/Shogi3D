@@ -28,11 +28,15 @@ public class Chessboard : MonoBehaviour
     private Camera currentCamera;
     private Vector2Int currentHover;
     private Vector3 bounds;
+    private bool isRegnantTurn;
 
 
     // Awake is called one time at the start of the project
     private void Awake()
     {
+        isRegnantTurn = true;   //TODO : Need to code the furigoma
+        // Furigoma : Le joueur le plus gradé jette 5 pions, s'il y a plus de pions non promus, il commence sinon c'est l'autre
+
         GenerateAllTiles(tileSize, TILE_COUNT_X, TILE_COUNT_Z);
         SpawnAllPieces();
         PositionAllPieces();
@@ -68,13 +72,14 @@ public class Chessboard : MonoBehaviour
                 tiles[hitPosition.x, hitPosition.y].layer = LayerMask.NameToLayer("Hover");     // Hover newtile
             }
 
-            //if (Input.GetMouseButtonDown(0))
             if (Input.GetMouseButtonDown(0))    //True when left click (0) pressed, else False
             {
                 if (shogiPieces[hitPosition.x, hitPosition.y] != null) // If we clicking on a piece
                 {
                     //Is it our turn ?
-                    if (true)
+                    if ((shogiPieces[hitPosition.x, hitPosition.y].team == 0 && isRegnantTurn)
+                        ||
+                        (shogiPieces[hitPosition.x, hitPosition.y].team == 1 && !isRegnantTurn))
                     {
                         currentlyDragging = shogiPieces[hitPosition.x, hitPosition.y];  //Reference copy
 
@@ -281,6 +286,25 @@ public class Chessboard : MonoBehaviour
         availableMoves.Clear();
     }
 
+    // Checkmate
+
+    private void CheckMate(int team)
+    {
+        DisplayVictory(team);
+    }
+    private void DisplayVictory(int winningTeam)
+    {
+
+    }
+    public void OnResetButton()
+    {
+
+    }
+    public void OnExitButton()
+    {
+
+    }
+
     // Operations
     private bool ContainsValidMove(ref List<Vector2Int> moves, Vector2 pos)
     {
@@ -308,6 +332,9 @@ public class Chessboard : MonoBehaviour
             // et ne dépace pas de l'écran
             if(ocp.team == 0)
             {
+                if (ocp.type == ShogiPieceType.Roi)
+                    CheckMate(1);
+
                 deadRegnant.Add(ocp);
                 ocp.SetScale(Vector3.one * deathSize);
                 ocp.SetPosition(
@@ -318,6 +345,9 @@ public class Chessboard : MonoBehaviour
             }
             else
             {
+                if (ocp.type == ShogiPieceType.GeneralDeJade)
+                    CheckMate(0);
+
                 deadOpposant.Add(ocp);
                 ocp.SetScale(Vector3.one * deathSize);
                 ocp.SetPosition(
@@ -332,8 +362,8 @@ public class Chessboard : MonoBehaviour
         shogiPieces[previousPosition.x, previousPosition.y] = null;
 
         PositionSinglePiece(x, z);
+        isRegnantTurn = !isRegnantTurn;
 
-        //We assuming that all the moves we doing are valids 
         return true;
     }
     private Vector2Int LookupTileIndex(GameObject hitInfo)
