@@ -1,6 +1,13 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+public enum SpecialMove 
+{
+    None = 0,
+    Promotion,
+    Parachutage,
+}
+
 public class Chessboard : MonoBehaviour
 {
     [Header("Art stuff")]
@@ -11,12 +18,13 @@ public class Chessboard : MonoBehaviour
     [SerializeField] private float deathSize = 0.8f;
     [SerializeField] private float deathSpacing = 0.5f;
     [SerializeField] private float dragOffset = 1.5f;
+    [SerializeField] private GameObject victoryScreen;
 
     [Header("Prefabs & Materials")]
     [SerializeField] private GameObject[] prefabs;
     [SerializeField] private Material[] teamMaterials;  // If we want to assign different colors or material to each team
 
-    // LOGIC
+    // LOGIC (Things that will be use in the program)
     private ShogiPiece[,] shogiPieces;
     private ShogiPiece currentlyDragging;
     private List<Vector2Int> availableMoves = new List<Vector2Int>();
@@ -29,6 +37,9 @@ public class Chessboard : MonoBehaviour
     private Vector2Int currentHover;
     private Vector3 bounds;
     private bool isRegnantTurn;
+
+    private List<Vector2Int[]> moveList = new List<Vector2Int[]>();
+    private SpecialMove specialMove;
 
 
     // Awake is called one time at the start of the project
@@ -83,8 +94,12 @@ public class Chessboard : MonoBehaviour
                     {
                         currentlyDragging = shogiPieces[hitPosition.x, hitPosition.y];  //Reference copy
 
-                        // Get a list of where I can go, highlight Tiles as well
+                        // Get a list of where I can go (The moves the piece have)
                         availableMoves = currentlyDragging.GetAvailableMoves(ref shogiPieces, TILE_COUNT_X, TILE_COUNT_Z);
+                        // Get a list of special move
+                        specialMove = currentlyDragging.GetSpecialMoves(ref shogiPieces, ref moveList, ref availableMoves);
+
+                        // Highlight Tiles
                         HighlightTiles();
                     }
                 }
@@ -97,7 +112,7 @@ public class Chessboard : MonoBehaviour
                 Vector2Int previousPosition = new Vector2Int(currentlyDragging.currentX, currentlyDragging.currentZ);
                 bool validMove = MoveTo(currentlyDragging, hitPosition.x, hitPosition.y);
                 if (!validMove)
-                    currentlyDragging.SetPosition( GetTileCenter(previousPosition.x, previousPosition.y));     
+                    currentlyDragging.SetPosition( GetTileCenter(previousPosition.x, previousPosition.y));
                 
                 currentlyDragging = null;
                 RemoveHighlightTiles();
@@ -228,7 +243,6 @@ public class Chessboard : MonoBehaviour
         for (int i = 0; i < TILE_COUNT_X; i++)
             shogiPieces[i, 6] = SpawnSinglePiece(ShogiPieceType.Pion, opposant);
     }
-
     private ShogiPiece SpawnSinglePiece(ShogiPieceType type, int team)
     {
         // - 1 to align the prefabs pieces with the enum type ShogiPieceType
@@ -287,26 +301,72 @@ public class Chessboard : MonoBehaviour
     }
 
     // Checkmate
-
     private void CheckMate(int team)
     {
         DisplayVictory(team);
     }
     private void DisplayVictory(int winningTeam)
     {
-
+        victoryScreen.SetActive(true);
+        victoryScreen.transform.GetChild(winningTeam).gameObject.SetActive(true);
     }
     public void OnResetButton()
     {
+        // UI
+        // We are accessing child value in theyre order by the hierarchy menu
+        victoryScreen.transform.GetChild(0).gameObject.SetActive(false);
+        victoryScreen.transform.GetChild(1).gameObject.SetActive(false);
+        victoryScreen.SetActive(false);
 
+        // Field Reset
+        currentlyDragging = null;
+        availableMoves.Clear();
+        moveList.Clear();
+
+        // Clean up
+        //  Board
+        for (int i = 0; i < TILE_COUNT_X; i++)
+        {
+            for (int j = 0; j < TILE_COUNT_Z; j++)
+            {
+                if (shogiPieces[i,j] != null)
+                {
+                    Destroy(shogiPieces[i, j].gameObject);
+                    shogiPieces[i, j] = null;
+                }
+            }
+        }
+
+        //  Cimetery
+        for (int x = 0; x < deadOpposant.Count; x++)
+            Destroy(deadOpposant[x].gameObject);
+
+        for (int x = 0; x < deadRegnant.Count; x++)
+            Destroy(deadRegnant[x].gameObject);
+
+        deadOpposant.Clear();
+        deadRegnant.Clear();
+
+        SpawnAllPieces();
+        PositionAllPieces();
+        isRegnantTurn = true;
     }
     public void OnExitButton()
     {
+        Application.Quit();
+    }
 
+    // Special Moves
+    private void ProcessSpecialMove()
+    {
+        if (specialMove == SpecialMove.Promotion)
+        {
+
+        }
     }
 
     // Operations
-    private bool ContainsValidMove(ref List<Vector2Int> moves, Vector2 pos)
+    private bool ContainsValidMove(ref List<Vector2Int> moves, Vector2Int pos)
     {
         for (int i = 0; i < moves.Count; i++)
             if (moves[i].x == pos.x && moves[i].y == pos.y)
@@ -363,6 +423,9 @@ public class Chessboard : MonoBehaviour
 
         PositionSinglePiece(x, z);
         isRegnantTurn = !isRegnantTurn;
+        moveList.Add(new Vector2Int[] { previousPosition, new Vector2Int(x, z) });
+
+        ProcessSpecialMove();
 
         return true;
     }

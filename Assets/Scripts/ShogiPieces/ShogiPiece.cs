@@ -33,16 +33,12 @@ public class ShogiPiece : MonoBehaviour
 
     public virtual List<Vector2Int> GetAvailableMoves(ref ShogiPiece[,] board, int tileCountX, int tileCountZ)
     {
-        List<Vector2Int> r = new List<Vector2Int>();
-
-        r.Add(new Vector2Int(4, 4));
-        r.Add(new Vector2Int(4, 5));
-        r.Add(new Vector2Int(5, 4));
-        r.Add(new Vector2Int(5, 5));
-
-        return r;
+        return new List<Vector2Int>();
     }
-
+    public virtual SpecialMove GetSpecialMoves(ref ShogiPiece[,] board, ref List<Vector2Int[]> moveList, ref List<Vector2Int> availableMoves) 
+    {
+        return SpecialMove.None;
+    }
     public virtual void SetPosition(Vector3 position, bool force = false)
     {
         desiredPosition = position;

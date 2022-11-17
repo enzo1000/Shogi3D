@@ -16,4 +16,6 @@ public class Pion : ShogiPiece
 
         return moves;
     }
+
+
 }
