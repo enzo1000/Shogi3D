@@ -1130,6 +1130,7 @@ MonoBehaviour:
   - {fileID: 3793520692610525012, guid: 7798af0741e43db42acce29d319bc1fc, type: 3}
   - {fileID: 6117416265038129771, guid: 48bccfd1292df2244bd884f59ab08f44, type: 3}
   - {fileID: 6247952647623631868, guid: 751704923ea604a44a8ddec17e82374a, type: 3}
+  PromotionPrefabs: []
   teamMaterials: []
 --- !u!1 &1976076743
 GameObject:

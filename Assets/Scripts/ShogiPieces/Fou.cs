@@ -70,4 +70,19 @@ public class Fou : ShogiPiece
 
         return moves;
     }
+
+    public override SpecialMove GetIfPromotion(ref ShogiPiece[,] board, ref List<Vector2Int[]> moveList)
+    {
+        if (team == 0)
+        {
+            if (moveList[^1][0].y >= 6 || moveList[^1][1].y >= 6)
+                return SpecialMove.Promotion;
+        }
+        else
+        {
+            if (moveList[^1][0].y <= 3 || moveList[^1][1].y <= 2)
+                return SpecialMove.Promotion;
+        }
+        return SpecialMove.None;
+    }
 }

@@ -26,4 +26,20 @@ public class GeneralDargent : ShogiPiece
 
         return moves;
     }
+
+    public override SpecialMove GetIfPromotion(ref ShogiPiece[,] board, ref List<Vector2Int[]> moveList)
+    {
+        if (team == 0)
+        {
+            // If our last move was in the promotion zone (moving out or in) or if our new move is in the promotion zone (moving in)
+            if (moveList[^1][0].y >= 6 || moveList[^1][1].y >= 6)
+                return SpecialMove.Promotion;
+        }
+        else
+        {
+            if (moveList[^1][0].y <= 2 || moveList[^1][1].y <= 2)
+                return SpecialMove.Promotion;
+        }
+        return SpecialMove.None;
+    }
 }
