@@ -734,6 +734,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: DamierAsset
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: fda5aa975c16b6c43bfe9ac5d32db2f4, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: fda5aa975c16b6c43bfe9ac5d32db2f4, type: 3}
 --- !u!1 &963194225

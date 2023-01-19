@@ -16,7 +16,6 @@ public class Pion : ShogiPiece
 
         return moves;
     }
-
     public override SpecialMove GetIfPromotion(ref ShogiPiece[,] board, ref List<Vector2Int[]> moveList)
     {
         // ^1 == the last element of (in a tab)

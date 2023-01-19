@@ -1,4 +1,6 @@
+using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public enum SpecialMove
@@ -103,7 +105,7 @@ public class Chessboard : MonoBehaviour
                         availableMoves = currentlyDragging.GetAvailableMoves(ref shogiPieces, TILE_COUNT_X, TILE_COUNT_Z);
 
                         // Highlight Tiles
-                        HighlightTiles(availableMoves);
+                        HighlightTiles(availableMoves, "Highlight");
                     }
                 }
             }
@@ -122,8 +124,14 @@ public class Chessboard : MonoBehaviour
                 {
                     //If the piece that we moved can be or must be promoted
                     // Start a co routine here to pause the update() fonction ?
-                    ProcessSpecialMove(currentlyDragging.GetIfPromotion(ref shogiPieces, ref moveList));
+                    SpecialMove sm = currentlyDragging.GetIfPromotion(ref shogiPieces, ref moveList);
+                    ProcessSpecialMove(sm);
+
+                    if(sm != 0)
+                        return;
+                   
                     isRegnantTurn = !isRegnantTurn;
+
                 }
                 currentlyDragging = null;
             }
@@ -149,7 +157,7 @@ public class Chessboard : MonoBehaviour
                         //En plus de cela, passer par available moves devrait normalement permettre un drop directement sur le board
                         // via le currently dragging et donc de ne pas passer par une coroutine.
                         dropableMoves = dropTarget.isDropable(ref shogiPieces, TILE_COUNT_X, TILE_COUNT_Z);
-                        HighlightTiles(dropableMoves);
+                        HighlightTiles(dropableMoves, "Highlight");
                     }
                 }
                 else
@@ -158,7 +166,7 @@ public class Chessboard : MonoBehaviour
                     if (!isRegnantTurn)
                     {
                         dropableMoves = dropTarget.isDropable(ref shogiPieces, TILE_COUNT_X, TILE_COUNT_Z);
-                        HighlightTiles(dropableMoves);
+                        HighlightTiles(dropableMoves, "Highlight");
                     }
                 }
             }
@@ -343,11 +351,11 @@ public class Chessboard : MonoBehaviour
     }
 
     // Highlight Tiles
-    private void HighlightTiles(List<Vector2Int> availableMovesL)
+    private void HighlightTiles(List<Vector2Int> availableMovesL, string LayerName)
     {
         for(int i = 0; i < availableMovesL.Count; i++)
         {
-            tiles[availableMovesL[i].x, availableMovesL[i].y].layer = LayerMask.NameToLayer("Highlight");
+            tiles[availableMovesL[i].x, availableMovesL[i].y].layer = LayerMask.NameToLayer(LayerName);
         }
     }
     private void RemoveHighlightTiles(List<Vector2Int> availableMovesL)
@@ -420,27 +428,15 @@ public class Chessboard : MonoBehaviour
     {
         // Let the player choose by highlighting his piece   (currentlyDraging)
         // Force the player to choose
+
         if (specialMove == SpecialMove.Promotion)
         {
+            this.enabled = false;
+
             print("Peux être promu");
             print(moveList[moveList.Count - 1][0] + " | " + moveList[moveList.Count - 1][1]);
-            //Make it loop here using a coroutine ?
-
-            RaycastHit info;
-            Ray ray = currentCamera.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out info, 100, LayerMask.GetMask("Tile", "Hover", "Highlight"))) // If our mouse hovering the board
-            {
-                //Highlight the piece
-                if (Input.GetMouseButtonDown(0))    //True when left click (0) pressed, else False
-                {
-                    Vector2Int hitPosition = LookupTileIndex(info.transform.gameObject);
-                    if (shogiPieces[hitPosition.x, hitPosition.y] != null) // If we clicking on a piece just in case
-                        if (shogiPieces[hitPosition.x, hitPosition.y] == shogiPieces[currentlyDragging.currentX, currentlyDragging.currentZ])
-                            //Promote
-                            print("Promotion");
-
-                }
-            }
+            HighlightTiles(new List<Vector2Int>() { new Vector2Int(currentlyDragging.currentX, currentlyDragging.currentZ) }, "Hover");
+            StartCoroutine(PromotionCoroutine());
             // if not, end his turn
         }
         else if (specialMove == SpecialMove.ForcedPromotion)
@@ -524,5 +520,47 @@ public class Chessboard : MonoBehaviour
                     return new Vector2Int(x,z);
 
         return -Vector2Int.one; //If bug return -1/-1
+    }
+
+    //Coroutines
+
+    IEnumerator PromotionCoroutine()
+    {
+        while (this.enabled == false)
+        {
+            RaycastHit info;
+            Ray ray = currentCamera.ScreenPointToRay(Input.mousePosition);
+
+
+                //Highlight the piece
+            if (Input.GetMouseButtonDown(0))    //True when left click (0) pressed, else False
+            {
+                if (Physics.Raycast(ray, out info, 100, LayerMask.GetMask("Tile", "Hover", "Highlight"))) // If our mouse hovering the board
+                {
+                    Vector2Int hitPosition = LookupTileIndex(info.transform.gameObject);
+                    if (shogiPieces[hitPosition.x, hitPosition.y] == shogiPieces[currentlyDragging.currentX, currentlyDragging.currentZ])
+                    {
+                        print("Promotion"); //Promote (We need to replace the piece)
+                        //Keske promotion ?
+                        // On supprime la piece de la zone touché
+                        // On la remplace avec la piece promu
+                        // voilà !
+                    }
+                    else
+                    {
+                        print("Pas promo");
+                    }
+                }
+                else
+                {
+                    print("Pas promo");
+                }
+                currentlyDragging = null;
+                this.enabled = true;
+                isRegnantTurn = !isRegnantTurn;
+                StopCoroutine(PromotionCoroutine());
+            }
+            yield return null;
+        }
     }
 }
