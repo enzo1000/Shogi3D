@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
+using static Unity.VisualScripting.Member;
 
 public enum SpecialMove
 {
@@ -20,7 +21,7 @@ public class Chessboard : MonoBehaviour
     [SerializeField] private Vector3 boardCenter = Vector3.zero;    // Center of the board set to zero
     [SerializeField] private float deathSize = 0.8f;
     [SerializeField] private float deathSpacing = 0.5f;
-    [SerializeField] private float dragOffset = 1.5f;
+    //[SerializeField] private float dragOffset = 1.5f;
     [SerializeField] private GameObject victoryScreen;
 
     [Header("Prefabs & Materials")]
@@ -32,7 +33,6 @@ public class Chessboard : MonoBehaviour
     private ShogiPiece[,] shogiPieces;
     private ShogiPiece currentlyDragging;
     private List<Vector2Int> availableMoves = new List<Vector2Int>();
-    private List<Vector2Int> dropableMoves = new List<Vector2Int>();
     private List<ShogiPiece> deadRegnant = new List<ShogiPiece>();   //Regnant = 0
     private List<ShogiPiece> deadOpposant = new List<ShogiPiece>();  //Opposant = 1
     private const int TILE_COUNT_X = 9;
@@ -80,8 +80,7 @@ public class Chessboard : MonoBehaviour
                 tiles[hitPosition.x, hitPosition.y].layer = LayerMask.NameToLayer("Hover");
             }
 
-            // If we were already hovering a tile, change the previous one
-            if(currentHover != hitPosition)
+            if(currentHover != hitPosition) // If we were already hovering a tile, change the previous one
             {
                 tiles[currentHover.x, currentHover.y].layer = (ContainsValidMove(ref availableMoves, currentHover)) ? LayerMask.NameToLayer("Highlight") : LayerMask.NameToLayer("Tile");    // Unhover current tile
                 currentHover = hitPosition;                                                     // Change tile
@@ -90,7 +89,8 @@ public class Chessboard : MonoBehaviour
 
             if (Input.GetMouseButtonDown(0))    //True when left click (0) pressed, else False
             {
-                Debug.Log(info.transform.name);
+                Debug.Log(info.transform.name); //ICI LA
+                Debug.Log(shogiPieces[hitPosition.x, hitPosition.y]); //ICI LA
 
                 if (shogiPieces[hitPosition.x, hitPosition.y] != null) // If we click on a piece
                 {
@@ -104,82 +104,70 @@ public class Chessboard : MonoBehaviour
                         // Get a list of where I can go (The moves the piece have)
                         availableMoves = currentlyDragging.GetAvailableMoves(ref shogiPieces, TILE_COUNT_X, TILE_COUNT_Z);
 
+                        PreventCheck(currentlyDragging);
+
                         // Highlight Tiles
                         HighlightTiles(availableMoves, "Highlight");
                     }
                 }
             }
-
-            //If we are releasing the mouse left button
-            if (currentlyDragging != null && Input.GetMouseButtonUp(0))
+            
+            if (currentlyDragging != null && Input.GetMouseButtonUp(0)) //If we are releasing the mouse left button
             {
-                // Thanks to the reference copy, we can get the old position of the piece before dragging it
-                Vector2Int previousPosition = new Vector2Int(currentlyDragging.currentX, currentlyDragging.currentZ);
-                bool validMove = MoveTo(currentlyDragging, hitPosition.x, hitPosition.y);
-                RemoveHighlightTiles(availableMoves);
-
-                if (!validMove)
-                    currentlyDragging.SetPosition(GetTileCenter(previousPosition.x, previousPosition.y));
-                else
+                if (currentlyDragging.gameObject.layer == LayerMask.NameToLayer("Alive")) // If the piece is already on the field
                 {
-                    //If the piece that we moved can be or must be promoted
-                    // Start a co routine here to pause the update() fonction ?
-                    SpecialMove sm = currentlyDragging.GetIfPromotion(ref shogiPieces, ref moveList);
-                    ProcessSpecialMove(sm);
+                    Vector2Int previousPosition = new Vector2Int(currentlyDragging.currentX, currentlyDragging.currentZ);
+                    bool validMove = MoveTo(currentlyDragging, hitPosition.x, hitPosition.y);
+                    RemoveHighlightTiles(availableMoves);
 
-                    if(sm != 0)
-                        return;
-                   
-                    isRegnantTurn = !isRegnantTurn;
-
+                    if (!validMove) //If the move is invalide
+                        currentlyDragging.SetPosition(GetTileCenter(previousPosition.x, previousPosition.y));
+                    else            //If valid, check promotion
+                        StartCoroutine(PromotionCoroutine());
                 }
-                currentlyDragging = null;
+                else if (currentlyDragging.gameObject.layer == LayerMask.NameToLayer("Dead"))// It's a drop from the graveyard
+                {
+                    DropTo(currentlyDragging, hitPosition.x, hitPosition.y);
+                    currentlyDragging = null;
+                    RemoveHighlightTiles(availableMoves);
+                }
             }
         }
-        else if(Physics.Raycast(ray, out info, 100, LayerMask.GetMask("Dead")))
+        else if(Physics.Raycast(ray, out info, 100, LayerMask.GetMask("Dead"))) //If we are mouse hovering a dead piece
         {
-            //Assumption : The piece is dead so we don't need to check if it is in eather graveyard
-            //  We can change the position of either graveyard because we just use a ray to target our pieces
-            if (Input.GetMouseButtonDown(0))
+            if (Input.GetMouseButtonDown(0)) //If we click
             {
-                // If we are clicking on a dead piece
                 ShogiPiece dropTarget = info.transform.GetComponents<ShogiPiece>()[0];
-                if (dropTarget.team == 1)
+                if (dropTarget.team == 0) //If we click on the Regnant graveyard
                 {
-                    //If we click on the Regnant graveyard
                     if (isRegnantTurn)
                     {
-                        //If it's the regnant turn
+                        availableMoves = dropTarget.isDropable(ref shogiPieces, TILE_COUNT_X, TILE_COUNT_Z);
 
-                        //TODO : Passer par available moves.
-                        // si on rajoute une vérification selon le masque de la couche (pour vérifier que la pièce vient du cimetière)
-                        // on peut supprimer la pièce du cimetiere quand on la drop.
-                        //En plus de cela, passer par available moves devrait normalement permettre un drop directement sur le board
-                        // via le currently dragging et donc de ne pas passer par une coroutine.
-                        dropableMoves = dropTarget.isDropable(ref shogiPieces, TILE_COUNT_X, TILE_COUNT_Z);
-                        HighlightTiles(dropableMoves, "Highlight");
+                        PreventCheck(dropTarget);
+
+                        HighlightTiles(availableMoves, "Highlight");
+                        currentlyDragging = dropTarget;
                     }
                 }
-                else
+                else //If we're clicking on the opposant graveyard
                 {
-                    //If we're clicking on the opposant graveyard
                     if (!isRegnantTurn)
                     {
-                        dropableMoves = dropTarget.isDropable(ref shogiPieces, TILE_COUNT_X, TILE_COUNT_Z);
-                        HighlightTiles(dropableMoves, "Highlight");
+                        availableMoves = dropTarget.isDropable(ref shogiPieces, TILE_COUNT_X, TILE_COUNT_Z);
+
+                        PreventCheck(dropTarget);
+
+                        HighlightTiles(availableMoves, "Highlight");
+                        currentlyDragging = dropTarget;
                     }
                 }
             }
-            // En fonction du type de la pièce on retourne une liste de coordonnées (x,z) où il peut drop
-            // Passer dans la méthode processSpecialMove ? Ici : Alors-non
-            // (On peut drag la pièce en suivant la souris (permettre un zoom dessus))
-            //      (Si on fait ça, retirer 1 yoffset aux pièce au "dessus" de la pièce drag)
-            // On Highlight les cases dropable
-            // Si (dans une deuxième temps), le joueur drop sa pièce sur une case dropable alors
-            //      On retire la pièce du cimetier, on l'ajoute aux coordonnées du clique et on passe le tour
-            //  Sinon
-            //      On repose la pièce à ses coordonnée initiale (pas oublier le yOffset du cimetiere)
-
+            else if (Input.GetMouseButtonUp(0))    //If we releasing our mouse button
+            {
+                currentlyDragging = null;
+                RemoveHighlightTiles(availableMoves);
+            }
         }
         else // Else : if we are not mouse hovering the board
         {
@@ -191,7 +179,19 @@ public class Chessboard : MonoBehaviour
             }
             if(currentlyDragging && Input.GetMouseButtonUp(0))
             {
-                currentlyDragging.SetPosition(GetTileCenter(currentlyDragging.currentX, currentlyDragging.currentZ));
+                if (currentlyDragging.gameObject.layer == LayerMask.NameToLayer("Alive"))
+                {
+                    currentlyDragging.SetPosition(GetTileCenter(currentlyDragging.currentX, currentlyDragging.currentZ));
+                }
+                /*else
+                {
+                    currentlyDragging.SetPosition(GetTileCenter(currentlyDragging.currentX, currentlyDragging.currentZ));
+                }*/
+                currentlyDragging = null;               //Ptet faire ça que au release de la souris et pas au down
+                RemoveHighlightTiles(availableMoves);
+            }
+            else if (Input.GetMouseButtonUp(0))    //If we releasing our mouse button
+            {
                 currentlyDragging = null;
                 RemoveHighlightTiles(availableMoves);
             }
@@ -199,13 +199,15 @@ public class Chessboard : MonoBehaviour
 
         //If we're dragging a piece
         //Make the piece fly and follow the mouse
+        /*
         if (currentlyDragging)
         {
             Plane horizontalPlane = new Plane(Vector3.up, Vector3.up * yOffset);
             float distance = 0.0f;
             if(horizontalPlane.Raycast(ray, out distance))
                 currentlyDragging.SetPosition(ray.GetPoint(distance) + Vector3.up * dragOffset);
-        }
+        }       
+        */
     }
 
     // Generate all the tiles of our board
@@ -235,6 +237,7 @@ public class Chessboard : MonoBehaviour
             for (int z = 0; z < tileCountZ; z++)
                 tiles[x, z] = GenerateSingleTile(tileSize, x, z);
     }
+
     // To create each tile of our board
     private GameObject GenerateSingleTile(float tileSize, int x, int z)
     {
@@ -262,11 +265,11 @@ public class Chessboard : MonoBehaviour
 
         return tileObject;
     }
+
     // Spawning of the pieces
     private void SpawnAllPieces()
     {
         shogiPieces = new ShogiPiece[TILE_COUNT_X, TILE_COUNT_Z];
-
         int regnant = 0, opposant = 1;
 
         // Regnant (0)
@@ -313,7 +316,6 @@ public class Chessboard : MonoBehaviour
         sp.team = team;
 
         sp.gameObject.AddComponent<BoxCollider>();
-
         sp.gameObject.layer = LayerMask.NameToLayer("Alive");
 
         // TODO : Faire comme dans le tuto est le définir en global
@@ -422,27 +424,214 @@ public class Chessboard : MonoBehaviour
     {
         Application.Quit();
     }
-
-    // Special Moves
-    private void ProcessSpecialMove(SpecialMove specialMove)
+    private void PreventCheck(ShogiPiece piece)
     {
-        // Let the player choose by highlighting his piece   (currentlyDraging)
-        // Force the player to choose
-
-        if (specialMove == SpecialMove.Promotion)
+        ShogiPiece targetGeneralKing = null;
+        //To know were the king is :
+        for (int x = 0; x < TILE_COUNT_X; x++)
         {
-            this.enabled = false;
+            for (int y = 0; y < TILE_COUNT_Z; y++)
+            {
+                if (shogiPieces[x, y] != null)
+                {
+                    if (piece.team == 0)
+                    {
+                        if (shogiPieces[x, y].type == ShogiPieceType.Roi)
+                        {
+                            targetGeneralKing = shogiPieces[x, y];
+                        }
+                    }
+                    else
+                    {
+                        if (shogiPieces[x, y].type == ShogiPieceType.GeneralDeJade)
+                        {
+                            targetGeneralKing = shogiPieces[x, y];
+                        }
+                    }
+                }
+            }
+        }
 
-            print("Peux être promu");
-            print(moveList[moveList.Count - 1][0] + " | " + moveList[moveList.Count - 1][1]);
-            HighlightTiles(new List<Vector2Int>() { new Vector2Int(currentlyDragging.currentX, currentlyDragging.currentZ) }, "Hover");
-            StartCoroutine(PromotionCoroutine());
-            // if not, end his turn
-        }
-        else if (specialMove == SpecialMove.ForcedPromotion)
+        //Since we're sending availableMoves, we will deleting moves that are putting us in check
+        SimulateMoveForSinglePiece(piece, ref availableMoves, targetGeneralKing);
+    }
+    private void SimulateMoveForSinglePiece(ShogiPiece sp, ref List<Vector2Int> moves, ShogiPiece targetGeneralKing)
+    {
+        //https://www.youtube.com/watch?v=rSntP8EC4kY&t=3s
+        //Explanation time code - 21:17
+
+        // Save the current values, to reset after the function call
+        int actualX = sp.currentX;
+        int actualY = sp.currentZ;
+        List<Vector2Int> movesToRemove = new List<Vector2Int>();
+
+        // Going through all the moves, simulate them and check if we're in check
+        for(int i = 0; i < moves.Count; i++)
         {
-            // Force the promotion
+            int simX = moves[i].x;
+            int simY = moves[i].y;
+
+            Vector2Int kingPositionThisSim = new Vector2Int(targetGeneralKing.currentX, targetGeneralKing.currentZ);
+            //Did we simulate the king's move
+            if(sp.type == targetGeneralKing.type)
+            {
+                kingPositionThisSim = new Vector2Int(simX, simY);
+            }
+
+            // Copy the [,] and not a reference
+            ShogiPiece[,] simulation = new ShogiPiece[TILE_COUNT_X, TILE_COUNT_Z];
+            List<ShogiPiece> simAttackingPieces = new List<ShogiPiece>();
+            for (int x = 0; x < TILE_COUNT_X; x++)
+            {
+                for (int z = 0; z < TILE_COUNT_Z; z++)
+                {
+                    if (shogiPieces[x, z] != null)
+                    {
+                        simulation[x, z] = shogiPieces[x, z];
+                        if (simulation[x, z].team != sp.team)
+                        {
+                            simAttackingPieces.Add(simulation[x, z]);
+                        }
+                    }
+                }
+            }
+
+            // Simulate that move
+            simulation[actualX, actualY] = null;
+            sp.currentX = simX;
+            sp.currentZ = simY;
+            simulation[simX, simY] = sp;
+
+            // Did one of the piece got taken down during our simulation
+            var deadPiece = simAttackingPieces.Find(s => s.currentX == simX && s.currentZ == simY);
+            if(deadPiece != null)
+            {
+                simAttackingPieces.Remove(deadPiece);
+            }
+
+            // Get all the simulated attacking pieces moves
+            List<Vector2Int> simMoves = new List<Vector2Int>();
+            for (int a = 0; a < simAttackingPieces.Count; a++)
+            {
+                var pieceMoves = simAttackingPieces[a].GetAvailableMoves(ref simulation, TILE_COUNT_X, TILE_COUNT_Z);
+                for (int b = 0; b < pieceMoves.Count; b++)
+                {
+                    simMoves.Add(pieceMoves[b]);
+                }
+            }
+
+            // Is the king in trouble ? if so, remove the move
+            if (ContainsValidMove(ref simMoves, kingPositionThisSim))
+            {
+                movesToRemove.Add(moves[i]);
+            }
+
+            // Restore the actual SP data
+            sp.currentX = actualX;
+            sp.currentZ = actualY;
         }
+
+        // Remove from the current available move list
+        for (int i = 0; i < movesToRemove.Count; i++)
+        {
+            moves.Remove(movesToRemove[i]);
+        }
+    }
+    private bool CheckForCheckmate()
+    {
+        var lastMove = moveList[moveList.Count - 1];
+        int targetTeam = (shogiPieces[lastMove[1].x, lastMove[1].y].team == 0) ? 1 : 0;
+        List<ShogiPiece> deadTargetPieces = (shogiPieces[lastMove[1].x, lastMove[1].y].team == 0) ? deadRegnant : deadOpposant;
+
+        List<ShogiPiece> attackingPieces = new List<ShogiPiece>();
+        List<ShogiPiece> defendingPieces = new List<ShogiPiece>();
+        List<ShogiPiece> defendingDropablePieces = new List<ShogiPiece>();
+
+        ShogiPiece targetGeneralKing = null;
+
+        //To know were the king is :
+        for (int x = 0; x < TILE_COUNT_X; x++)
+        {
+            for (int y = 0; y < TILE_COUNT_Z; y++)
+            {
+                if (shogiPieces[x, y] != null)
+                {
+                    if (shogiPieces[x, y].team == targetTeam)
+                    {
+                        defendingPieces.Add(shogiPieces[x, y]);
+                    }
+                    else
+                    {
+                        attackingPieces.Add(shogiPieces[x, y]);
+                    }
+
+                    if (shogiPieces[x, y].team == 0)
+                    {
+                        if (shogiPieces[x, y].type == ShogiPieceType.Roi)
+                        {
+                            targetGeneralKing = shogiPieces[x, y];
+                        }
+                    }
+                    else
+                    {
+                        if (shogiPieces[x, y].type == ShogiPieceType.GeneralDeJade)
+                        {
+                            targetGeneralKing = shogiPieces[x, y];
+                        }
+                    }
+                }
+            }
+        }
+
+        //Defending dead pieces
+        foreach (ShogiPiece sp in deadTargetPieces)
+        {
+            defendingDropablePieces.Add(sp);
+        }
+
+        //Is the king attacked right now ?
+        List<Vector2Int> currentAvailableMoves = new List<Vector2Int>();
+        for(int i = 0; i < attackingPieces.Count; i++)
+        {
+            var pieceMoves = attackingPieces[i].GetAvailableMoves(ref shogiPieces, TILE_COUNT_X, TILE_COUNT_Z);
+            for (int b = 0; b < pieceMoves.Count; b++)
+            {
+                currentAvailableMoves.Add(pieceMoves[b]);
+            }
+        }
+
+        //Are we in check right now ?
+        if (ContainsValidMove(ref currentAvailableMoves, new Vector2Int(targetGeneralKing.currentX, targetGeneralKing.currentZ)))
+        {
+            // King is under attack, can we move something to help him ?
+            for (int i = 0; i < defendingPieces.Count; i++)
+            {
+                List<Vector2Int> defendingMoves = defendingPieces[i].GetAvailableMoves(ref shogiPieces, TILE_COUNT_X, TILE_COUNT_Z);
+                SimulateMoveForSinglePiece(defendingPieces[i], ref defendingMoves, targetGeneralKing);
+
+                if (defendingMoves.Count != 0)
+                {
+                    Debug.Log("On peut défendre le roi en bougeant" + defendingMoves[0].x + " | " + defendingMoves[0].y);
+                    return false;
+                }
+            }
+            
+            //Idem but, can we drop a piece to help him ?
+            for (int j = 0; j < defendingDropablePieces.Count; j++)
+            {
+                List<Vector2Int> defendingDrops = defendingDropablePieces[j].isDropable(ref shogiPieces, TILE_COUNT_X, TILE_COUNT_Z);
+                SimulateMoveForSinglePiece(defendingDropablePieces[j], ref defendingDrops, targetGeneralKing);
+
+                if (defendingDrops.Count != 0)
+                {
+                    Debug.Log("On peut défendre le roi en se parachutant" + defendingDrops[0].x + " | " + defendingDrops[0].y);
+                    return false;
+                }
+            }
+            Debug.Log("Checkmate");
+            return true;    //Checkmate exit
+        }
+        return false;
     }
 
     // Operations
@@ -467,41 +656,66 @@ public class Chessboard : MonoBehaviour
             if (ocp.team == cp.team)
                 return false;
 
-            // If it's the enemy team
-            // TODO : Mettre en place un système de colonne de tel manière à ce que les pièces soit visible
-            // et ne dépace pas de l'écran
-            // Ou faire un cercle de pièce mais alors là faut faire des maths
-
-            ocp.gameObject.layer = LayerMask.NameToLayer("Dead");
-
+            //Spawn une pièce et on la déplace
+            //TODO : Rajouter une 2eme colonne si le nombre de pièce dans le cimetière dépasse un certain nombre
             if (ocp.team == 0)
             {
                 if (ocp.type == ShogiPieceType.Roi)
                     CheckMate(1);
 
-                deadRegnant.Add(ocp);
-                ocp.SetScale(Vector3.one * deathSize);
-                ocp.SetPosition(
-                    new Vector3(-1 * tileSize, yOffset, 9 * tileSize)           // Size of the board
-                    - bounds                                                    // Its Boundaries
-                    + new Vector3(tileSize / 2, 0, tileSize / 2)                // Center of the "tile"
-                    + (Vector3.back * deathSpacing) * deadRegnant.Count);       // Because we adding more or less pieces
-                ocp.transform.RotateAround(transform.position, Vector3.up, 180);
+                ShogiPiece osp = Instantiate(prefabs[(int)ocp.type - 1], transform).GetComponent<ShogiPiece>();
+
+                Vector3 movement = new Vector3(-1 * tileSize, yOffset, 9 * tileSize)           // Size of the board
+                    - bounds                                                   // Its Boundaries
+                    + new Vector3(tileSize / 2, 0, tileSize / 2)               // Center of the "tile"
+                    + (Vector3.back * deathSpacing) * deadRegnant.Count;       // Because we adding more or less pieces
+
+                osp.SetPosition(movement, true);
+                osp.SetScale(Vector3.one * deathSize);
+
+                osp.type = ocp.type;
+                osp.typeP = ocp.typeP;
+                osp.team = currentlyDragging.team;  //We changing the team here for dropable function purpose 
+                osp.isPromoted = false;             //Do we need to do it again here or does it auto do when instantiate ?
+                osp.gameObject.AddComponent<BoxCollider>();
+                osp.gameObject.layer = LayerMask.NameToLayer("Dead");
+
+                deadRegnant.Add(osp);
+
+                Destroy(shogiPieces[x, z].GameObject());
             }
             else
             {
                 if (ocp.type == ShogiPieceType.GeneralDeJade)
                     CheckMate(0);
 
-                deadOpposant.Add(ocp);
-                ocp.SetScale(Vector3.one * deathSize);
-                ocp.SetPosition(
-                    new Vector3(9 * tileSize, yOffset, -1 * tileSize)           // Size of the board
-                    - bounds                                                    // Bounds of it
-                    + new Vector3(tileSize / 2, 0, tileSize / 2)                // Center of the "tile"
-                    + (Vector3.forward * deathSpacing) * deadOpposant.Count);   // Because we adding more or less pieces
-                ocp.transform.RotateAround(transform.position, Vector3.up, 180);
+                //Vector3 position = new Vector3(ocp.transform.position.x, ocp.transform.position.y, ocp.transform.position.z);
+
+                Vector3 movement = new Vector3(9 * tileSize, yOffset, -1 * tileSize)
+                                    - bounds
+                                    + new Vector3(tileSize / 2, 0, tileSize / 2)
+                                    + (Vector3.forward * deathSpacing) * deadOpposant.Count;
+
+                Quaternion rotation = new Quaternion(ocp.transform.rotation.y, ocp.transform.rotation.w, ocp.transform.rotation.x, ocp.transform.rotation.z);
+
+                ShogiPiece osp = Instantiate(prefabs[(int)ocp.type - 1], transform).GetComponent<ShogiPiece>();
+                osp.transform.RotateAround(transform.position, Vector3.up, 180);
+
+                osp.SetScale(Vector3.one * deathSize);
+                osp.SetPosition(movement, true);
+
+                osp.type = currentlyDragging.type;
+                osp.typeP = ocp.typeP;
+                osp.team = currentlyDragging.team;
+                osp.isPromoted = false; 
+                osp.gameObject.AddComponent<BoxCollider>();
+                osp.gameObject.layer = LayerMask.NameToLayer("Dead");
+
+                deadOpposant.Add(osp);
+
+                Destroy(shogiPieces[x, z].GameObject());
             }
+            //Change ocp.currentX and Z here ?
         }
 
         shogiPieces[x, z] = cp;
@@ -510,7 +724,62 @@ public class Chessboard : MonoBehaviour
         PositionSinglePiece(x, z);
         moveList.Add(new Vector2Int[] {previousPosition, new Vector2Int(x, z)});
 
+        if (CheckForCheckmate())    //If after our move, we are checkmating the oponent
+        {
+            CheckMate(cp.team);     //Is that true ?
+        }
+
         return true;
+    }
+    private void DropTo(ShogiPiece sp, int x, int z)
+    {
+        if(ContainsValidMove(ref availableMoves, new Vector2Int(x, z))) 
+        {
+            //print("On drop au bon endroit");
+            sp.gameObject.layer = LayerMask.NameToLayer("Alive");       //Change the piece layout ??? (to alive)
+            sp.SetPosition(GetTileCenter(x, z));
+            sp.currentX = x;
+            sp.currentZ = z;
+            sp.SetScale(Vector3.one);
+
+            shogiPieces[x, z] = sp;
+
+            List<ShogiPiece> deadCimetery;
+            float yOffset;
+
+            if (!isRegnantTurn)
+            {
+                deadCimetery = deadRegnant;
+                yOffset = -deathSpacing;
+            }
+            else
+            {
+                deadCimetery = deadOpposant;
+                yOffset = deathSpacing;
+            }
+                        
+            int index = deadCimetery.IndexOf(sp);
+            //Debug.Log("Son index dans le cimetière est : " + index);
+
+            //On parcour notre tableau à partir de la pièce au dessus de notre pièce
+            for (int i = index + 1; i < deadCimetery.Count; i++)
+            {
+                //Debug.Log("Pièces au dessus : " + deadCimetery[i]);
+                deadCimetery[i].SetPosition(deadCimetery[i].transform.position - new Vector3(0, 0, yOffset));
+            }
+
+            deadCimetery.Remove(sp);
+            isRegnantTurn = !isRegnantTurn;
+
+            // 10 represent the graveyard
+            moveList.Add(new Vector2Int[] { new Vector2Int(10, 10), new Vector2Int(x, z) });
+
+            if (CheckForCheckmate())    //If after our drop, we are checkmating the oponent
+            {
+                CheckMate(sp.team);
+            }
+
+        }
     }
     private Vector2Int LookupTileIndex(GameObject hitInfo)
     {
@@ -523,44 +792,93 @@ public class Chessboard : MonoBehaviour
     }
 
     //Coroutines
-
     IEnumerator PromotionCoroutine()
     {
-        while (this.enabled == false)
+        //this.enabled = false;
+        //Récup coordonnées du currentlyDragging ici (cette ligne) afin de réactiver la fonction pour que la pièce suive le curseur
+        SpecialMove sm = currentlyDragging.GetIfPromotion(ref shogiPieces, ref moveList);
+        int coordX = currentlyDragging.currentX;
+        int coordY = currentlyDragging.currentZ;
+        while (1 == 1)
         {
             RaycastHit info;
             Ray ray = currentCamera.ScreenPointToRay(Input.mousePosition);
-
-
-                //Highlight the piece
-            if (Input.GetMouseButtonDown(0))    //True when left click (0) pressed, else False
+            if (sm == SpecialMove.Promotion)
             {
-                if (Physics.Raycast(ray, out info, 100, LayerMask.GetMask("Tile", "Hover", "Highlight"))) // If our mouse hovering the board
+                List<Vector2Int> promotL = new List<Vector2Int>() { new Vector2Int(coordX, coordY) };
+                HighlightTiles(promotL, "Hover");
+                if (Input.GetMouseButtonDown(0))    //True when left click (0) pressed, else False
                 {
-                    Vector2Int hitPosition = LookupTileIndex(info.transform.gameObject);
-                    if (shogiPieces[hitPosition.x, hitPosition.y] == shogiPieces[currentlyDragging.currentX, currentlyDragging.currentZ])
+                    if (Physics.Raycast(ray, out info, 100, LayerMask.GetMask("Tile", "Hover", "Highlight"))) // If our mouse hovering the board
                     {
-                        print("Promotion"); //Promote (We need to replace the piece)
-                        //Keske promotion ?
-                        // On supprime la piece de la zone touché
-                        // On la remplace avec la piece promu
-                        // voilà !
+                        Vector2Int hitPosition = LookupTileIndex(info.transform.gameObject);
+                        if (shogiPieces[hitPosition.x, hitPosition.y] == shogiPieces[coordX, coordY])
+                        {
+                            //Création piece promu
+
+                            ShogiPiece sp = Instantiate(PromotionPrefabs[(int)currentlyDragging.typeP - 1], transform).GetComponent<ShogiPiece>();
+
+                            sp.type = currentlyDragging.type;
+                            sp.typeP = currentlyDragging.typeP;
+                            sp.team = currentlyDragging.team;
+                            sp.isPromoted = true;
+                            sp.gameObject.AddComponent<BoxCollider>();
+                            sp.gameObject.layer = LayerMask.NameToLayer("Alive");
+                            
+                            if (currentlyDragging.team == 0)
+                                sp.transform.RotateAround(transform.position, Vector3.up, 180);
+                            
+                            //Destruction pièce sur le board
+                            Destroy(shogiPieces[coordX, coordY].gameObject);
+
+                            shogiPieces[coordX, coordY] = sp;
+                            PositionSinglePiece(coordX, coordY, true);
+
+                            RemoveHighlightTiles(promotL);
+                            RemoveHighlightTiles(availableMoves);
+                        }
                     }
-                    else
-                    {
-                        print("Pas promo");
-                    }
+                    RemoveHighlightTiles(promotL);
+                    currentlyDragging = null;
+                    isRegnantTurn = !isRegnantTurn;
+                    StopCoroutine(PromotionCoroutine());
+                    break;
                 }
-                else
-                {
-                    print("Pas promo");
-                }
+            }
+            else if (sm == SpecialMove.ForcedPromotion)
+            {
+
+                //We can simplifie this with SpawnSinglePiece function
+                ShogiPiece sp = Instantiate(PromotionPrefabs[(int)currentlyDragging.typeP - 1], transform).GetComponent<ShogiPiece>();
+
+                sp.type = currentlyDragging.type;
+                sp.typeP = ShogiPromuType.None;
+                sp.team = currentlyDragging.team;
+                sp.gameObject.AddComponent<BoxCollider>();
+                sp.gameObject.layer = LayerMask.NameToLayer("Alive");
+
+                if (currentlyDragging.team == 0)
+                    sp.transform.RotateAround(transform.position, Vector3.up, 180);
+
+                //Destroy the mesh pieces on the board
+                Destroy(shogiPieces[coordX, coordY].gameObject);
+
+                shogiPieces[coordX, coordY] = sp;
+                PositionSinglePiece(coordX, coordY, true);
                 currentlyDragging = null;
-                this.enabled = true;
                 isRegnantTurn = !isRegnantTurn;
                 StopCoroutine(PromotionCoroutine());
+                break;
+            }
+            else
+            {
+                currentlyDragging = null;
+                isRegnantTurn = !isRegnantTurn;
+                StopCoroutine(PromotionCoroutine());
+                break;
             }
             yield return null;
         }
+        yield return 0;
     }
 }

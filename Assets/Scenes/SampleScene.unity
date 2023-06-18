@@ -153,7 +153,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4f231c4fb786f3946a6b90b886c48677, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_SendPointerHoverToParent: 1
   m_HorizontalAxis: Horizontal
   m_VerticalAxis: Vertical
   m_SubmitButton: Submit
@@ -1122,7 +1121,6 @@ MonoBehaviour:
   boardCenter: {x: 0, y: 0, z: 0}
   deathSize: 0.8
   deathSpacing: 0.5
-  dragOffset: 1.5
   victoryScreen: {fileID: 1301956584}
   prefabs:
   - {fileID: 3864509998090417303, guid: 8fdab079852194e4d9d28ea5ad283217, type: 3}
@@ -1134,7 +1132,13 @@ MonoBehaviour:
   - {fileID: 3793520692610525012, guid: 7798af0741e43db42acce29d319bc1fc, type: 3}
   - {fileID: 6117416265038129771, guid: 48bccfd1292df2244bd884f59ab08f44, type: 3}
   - {fileID: 6247952647623631868, guid: 751704923ea604a44a8ddec17e82374a, type: 3}
-  PromotionPrefabs: []
+  PromotionPrefabs:
+  - {fileID: 9151392987577488278, guid: 8d889a8bc76b2fe4f945ee10781911d9, type: 3}
+  - {fileID: 8261550082585867239, guid: 8b158161def73f84f89b420159dc871a, type: 3}
+  - {fileID: 730229326404818304, guid: 29526ac37e9a08a488b28d521f72c7d7, type: 3}
+  - {fileID: 8534855752539944383, guid: 6c27a1a04d4a21a48bc8254e88b1c6ff, type: 3}
+  - {fileID: 8972578660514264255, guid: 2c12d1c6abd5e3143a3125cb830e1874, type: 3}
+  - {fileID: 6743043674591799572, guid: 688639b6f62e7b5418b9b0b54f366db9, type: 3}
   teamMaterials: []
 --- !u!1 &1976076743
 GameObject:

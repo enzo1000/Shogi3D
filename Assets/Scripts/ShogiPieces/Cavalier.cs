@@ -24,7 +24,6 @@ public class Cavalier : ShogiPiece
 
         return moves;
     }
-
     private bool CalculMove(ref ShogiPiece[,] board, int tileCountX, int tileCountZ, int x, int z)
     {
         if (x >= 0 && x < tileCountX && z < tileCountZ && z >= 0)
@@ -32,31 +31,36 @@ public class Cavalier : ShogiPiece
                 return true;
         return false;
     }
-
     public override SpecialMove GetIfPromotion(ref ShogiPiece[,] board, ref List<Vector2Int[]> moveList)
     {
         if (team == 0)
         {
             // If our last move was in the promotion zone (moving out or in) or if our new move is in the promotion zone (moving in)
             if (moveList[^1][1].y >= 6)
+            {
                 if (moveList[^1][1].y > 6)
+                {
                     return SpecialMove.ForcedPromotion;
-            return SpecialMove.Promotion;
+                }
+                return SpecialMove.Promotion;
+            }
         }
         else
         {
             if (moveList[^1][1].y <= 2)
+            {
                 if (moveList[^1][1].y < 2)
+                {
                     return SpecialMove.ForcedPromotion;
-            return SpecialMove.Promotion;
+                }
+                return SpecialMove.Promotion;
+            }                
         }
+        return SpecialMove.None;
     }
-
     public override List<Vector2Int> isDropable(ref ShogiPiece[,] board, int TILE_COUNT_X, int TILE_COUNT_Z)
     {
         List<Vector2Int> dropList = new List<Vector2Int>();
-
-        // Need to know if the lancier is from the regnant or the opponent to know if it is dropable on the last line of the board
 
         // lastLine = true if Regnant / false if opposant
         bool lastLine = (team == 0) ? true : false;
@@ -65,19 +69,23 @@ public class Cavalier : ShogiPiece
         {
             for (int z = 0; z < TILE_COUNT_Z; z++)
             {
-                if (board[x, z] != null)
+                if (board[x, z] == null)
                 {
                     if (lastLine)
                     {
-                        if (z >= 2)
+                        if (z <= 6)
+                        {
                             dropList.Add(new Vector2Int(x, z));
+                        }
                     }
                     else
                     {
-                        if (z <= 6)
+                        if (z >= 2)
+                        {
                             dropList.Add(new Vector2Int(x, z));
-                    }
-                }
+                        }  
+                    }   
+                }   
             }
         }
         return dropList;

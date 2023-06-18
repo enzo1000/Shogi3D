@@ -27,21 +27,24 @@ public class Pion : ShogiPiece
             if (moveList[^1][1].y >= 6)
             {
                 if (moveList[^1][1].y == 8)
+                {
                     return SpecialMove.ForcedPromotion;
+                }
                 return SpecialMove.Promotion;
             }
-            return SpecialMove.None;
         }
         else
         {
             if (moveList[^1][1].y <= 2)
             {
                 if (moveList[^1][1].y == 0)
+                {
                     return SpecialMove.ForcedPromotion;
+                }
                 return SpecialMove.Promotion;
             }
-            return SpecialMove.None;
         }
+        return SpecialMove.None;
     }
     public override List<Vector2Int> isDropable(ref ShogiPiece[,] board, int TILE_COUNT_X, int TILE_COUNT_Z)
     {
@@ -52,30 +55,43 @@ public class Pion : ShogiPiece
         // If put in front of the king to mate (unallowed)
         // If it is on the same column of one of the other same team pawn
 
-        //Marche pas, rend 3 au lieu de 6 
-        // Le pion ne peut pas être drop sur la last ligne du tableau (à ajouter)
-
         int direction = (team == 0) ? 1 : -1;
-        bool lastLine = (team == 0) ? true : false;
+        bool lastLine = (team == 1) ? true : false;
         List<Vector2Int> dropList = new List<Vector2Int>();
         bool canBeDrop;
 
         for (int x = 0; x < TILE_COUNT_X; x++)
+        {
             for (int z = 0; z < TILE_COUNT_Z; z++)
             {
                 canBeDrop = true;
-                //Colomn checking
+                //Column checking
                 for (int z2 = 0; z2 < TILE_COUNT_Z; z2++)
+                {
                     if (board[x, z2] != null)
-                        if (board[x, z2].team != team && board[x, z2].type == type) //Quick reminder that the piece in the graveyard is an opponent piece
+                    {
+
+                        Debug.Log(board[x, z2] + " ne gène pas");
+                        if (board[x, z2].team == team && board[x, z2].type == type && board[x, z2].isPromoted == false)
+                        {
+                            Debug.Log(board[x, z2] + " nous empeche de poser");
                             canBeDrop = false;
+                        }
+                    }
+                }
 
                 //King checking
-                if (x + direction < TILE_COUNT_X && x + direction >= 0)
-                    if (board[x + direction, z] != null)
-                        if (board[x + direction, z].team == team && board[x + direction, z].type == ShogiPieceType.Roi) //Same here
+                if (z + direction < TILE_COUNT_Z && z + direction >= 0)
+                {
+                    if (board[x, z + direction] != null)
+                    {
+                        if (board[x, z + direction].team != team && (board[x, z + direction].type == ShogiPieceType.GeneralDeJade || board[x, z + direction].type == ShogiPieceType.Roi))
+                        {
                             canBeDrop = false;
-
+                        }
+                    }  
+                }
+                //Last line checking
                 if (canBeDrop)
                 {
                     if (board[x, z] == null)
@@ -83,16 +99,21 @@ public class Pion : ShogiPiece
                         if (lastLine)
                         {
                             if (z != 0)
+                            {
                                 dropList.Add(new Vector2Int(x, z));
+                            }
                         }
                         else
                         {
                             if (z != 8)
+                            {
                                 dropList.Add(new Vector2Int(x, z));
-                        }
+                            }
+                        }     
                     }
                 }
             }
+        }
         return dropList;
     }
 }

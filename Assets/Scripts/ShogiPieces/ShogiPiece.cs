@@ -32,6 +32,7 @@ public class ShogiPiece : MonoBehaviour
     public int currentZ;
     public ShogiPieceType type;
     public ShogiPromuType typeP;
+    public bool isPromoted = false;
 
     private Vector3 desiredPosition;
     private Vector3 desiredScale = Vector3.one;
@@ -88,7 +89,7 @@ public class ShogiPiece : MonoBehaviour
 
         for (int x = 0; x < TILE_COUNT_X; x++)
             for (int z = 0; z < TILE_COUNT_Z; z++)
-                if (board[x, z] != null)
+                if (board[x, z] == null)
                     dropList.Add(new Vector2Int(x, z));
 
         return dropList;

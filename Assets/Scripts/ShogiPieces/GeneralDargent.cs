@@ -26,7 +26,6 @@ public class GeneralDargent : ShogiPiece
 
         return moves;
     }
-
     public override SpecialMove GetIfPromotion(ref ShogiPiece[,] board, ref List<Vector2Int[]> moveList)
     {
         if (team == 0)
